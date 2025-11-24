@@ -1,0 +1,835 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Advanced Timetable Generator</title>
+<style>
+  body {
+    font-family: "Poppins", sans-serif;
+    background: #eef3ff;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  h1 {
+    text-align: center;
+    color: #2b3eaa;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+  }
+  input, button, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  button {
+    background: #2b3eaa;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover {
+    background: #182677;
+  }
+  .class-block {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #aaa;
+    padding: 8px;
+    text-align: center;
+  }
+  th {
+    background: #dbe2ff;
+  }
+  td.lab {
+    background-color: #b8f7b8;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Advanced Timetable Generator</h1>
+
+  <label>Number of Classes:</label>
+  <input type="number" id="numClasses" min="1" value="1">
+  <button onclick="createClassInputs()">Next ➜</button>
+
+  <div id="classInputs"></div>
+  <button onclick="generateTimetables()">Generate All Timetables</button>
+
+  <div id="output"></div>
+</div>
+
+<script>
+function createClassInputs() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const div = document.getElementById('classInputs');
+  div.innerHTML = '';
+
+  for (let i = 0; i < n; i++) {
+    div.innerHTML += `
+      <div class="class-block" id="class${i}">
+        <h3>Class ${i + 1}</h3>
+        <label>Class Name:</label>
+        <input type="text" id="cname${i}" placeholder="e.g. 1st Year CSE">
+
+        <label>Number of Days:</label>
+        <input type="number" id="days${i}" min="1" value="5">
+
+        <label>Periods per Day:</label>
+        <input type="number" id="periods${i}" min="1" value="6">
+
+        <label>Day Order or Week Format:</label>
+        <select id="dayType${i}">
+          <option value="Mon-Sat">Mon-Sat</option>
+          <option value="Day Order">Day Order (1,2,3,...)</option>
+        </select>
+
+        <label>Number of Normal Subjects:</label>
+        <input type="number" id="normalCount${i}" min="1" value="3">
+        <div id="normalList${i}"></div>
+        <button onclick="addNormalSubjects(${i})">Add Normal Subjects</button>
+
+        <label>Number of Lab Subjects:</label>
+        <input type="number" id="labCount${i}" min="0" value="1">
+        <div id="labList${i}"></div>
+        <button onclick="addLabSubjects(${i})">Add Lab Subjects</button>
+      </div>
+    `;
+  }
+}
+
+function addNormalSubjects(i) {
+  const n = parseInt(document.getElementById('normalCount' + i).value);
+  const div = document.getElementById('normalList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Subject ${j+1}" id="sub${i}_${j}">
+      <input type="text" placeholder="Teacher ${j+1}" id="teach${i}_${j}">
+      <input type="number" placeholder="Total appearances (e.g. 5)" id="subCount${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+function addLabSubjects(i) {
+  const n = parseInt(document.getElementById('labCount' + i).value);
+  const div = document.getElementById('labList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Lab Subject ${j+1}" id="labsub${i}_${j}">
+      <input type="text" placeholder="Lab Teacher ${j+1}" id="labteach${i}_${j}">
+      <input type="number" placeholder="Total labs (each = 2 periods)" id="labCountTotal${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+function generateTimetables() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const output = document.getElementById('output');
+  output.innerHTML = '';
+
+  for (let i = 0; i < n; i++) {
+    const cname = document.getElementById('cname' + i).value;
+    const numDays = parseInt(document.getElementById('days' + i).value);
+    const periods = parseInt(document.getElementById('periods' + i).value);
+    const dayType = document.getElementById('dayType' + i).value;
+
+    const subjects = [];
+    const labs = [];
+
+    // normal subjects
+    const normalCount = parseInt(document.getElementById('normalCount' + i).value);
+    for (let j = 0; j < normalCount; j++) {
+      const sub = document.getElementById(`sub${i}_${j}`)?.value;
+      const t = document.getElementById(`teach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`subCount${i}_${j}`)?.value);
+      if (sub && t && count) subjects.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    // lab subjects
+    const labCount = parseInt(document.getElementById('labCount' + i).value);
+    for (let j = 0; j < labCount; j++) {
+      const sub = document.getElementById(`labsub${i}_${j}`)?.value;
+      const t = document.getElementById(`labteach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`labCountTotal${i}_${j}`)?.value);
+      if (sub && t && count) labs.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    const days = dayType === "Mon-Sat"
+      ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].slice(0, numDays)
+      : Array.from({length: numDays}, (_,k)=>`Day ${k+1}`);
+
+    let table = `<h2>${cname}</h2><table><tr><th>Day/Period</th>`;
+    for (let p = 1; p <= periods; p++) table += `<th>P${p}</th>`;
+    table += `</tr>`;
+
+    for (let d = 0; d < numDays; d++) {
+      table += `<tr><td>${days[d]}</td>`;
+      let p = 0;
+      while (p < periods) {
+        // try lab first
+        if (labs.length > 0 && Math.random() < 0.3 && p < periods - 1) {
+          const lab = labs.find(l => l.remaining > 0);
+          if (lab) {
+            table += `<td colspan="2" class="lab">${lab.subject} (${lab.teacher})</td>`;
+            lab.remaining--;
+            p += 2;
+            continue;
+          }
+        }
+
+        // pick normal subject with remaining > 0
+        const availSubs = subjects.filter(s => s.remaining > 0);
+        if (availSubs.length === 0) break;
+        const s = availSubs[Math.floor(Math.random() * availSubs.length)];
+        table += `<td>${s.subject} (${s.teacher})</td>`;
+        s.remaining--;
+        p++;
+      }
+      table += `</tr>`;
+    }
+
+    table += `</table>`;
+    output.innerHTML += table;
+  }
+}
+</script>
+</body>
+</html> -->
+
+<!-- <!DOCTYPE html>
+<!-- <html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Automatic Timetable Generator</title>
+<style>
+  body {
+    font-family: "Poppins", sans-serif;
+    background: #eef3ff;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  h1 {
+    text-align: center;
+    color: #2b3eaa;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+  }
+  input, button, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  button {
+    background: #2b3eaa;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover {
+    background: #182677;
+  }
+  .class-block {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #aaa;
+    padding: 8px;
+    text-align: center;
+  }
+  th {
+    background: #dbe2ff;
+  }
+  td.lab {
+    background-color: #b8f7b8;
+    font-weight: bold;
+  }
+  .download-btn {
+    background: #00994d;
+    margin: 10px 0;
+  }
+  .download-btn:hover {
+    background: #006633;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Advanced Timetable Generator</h1>
+
+  <label>Number of Classes:</label>
+  <input type="number" id="numClasses" min="1" value="1">
+  <button onclick="createClassInputs()">Next ➜</button>
+
+  <div id="classInputs"></div>
+  <button onclick="generateTimetables()">Generate All Timetables</button>
+
+  <div id="output"></div>
+  <div id="teacherOutput"></div>
+</div>
+
+<!-- jsPDF for PDF download 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+function createClassInputs() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const div = document.getElementById('classInputs');
+  div.innerHTML = '';
+
+  for (let i = 0; i < n; i++) {
+    div.innerHTML += `
+      <div class="class-block" id="class${i}">
+        <h3>Class ${i + 1}</h3>
+        <label>Class Name:</label>
+        <input type="text" id="cname${i}" placeholder="e.g. 1st Year CSE">
+
+        <label>Number of Days:</label>
+        <input type="number" id="days${i}" min="1" value="5">
+
+        <label>Periods per Day:</label>
+        <input type="number" id="periods${i}" min="1" value="6">
+
+        <label>Day Order or Week Format:</label>
+        <select id="dayType${i}">
+          <option value="Mon-Sat">Mon-Sat</option>
+          <option value="Day Order">Day Order (1,2,3,...)</option>
+        </select>
+
+        <label>Number of Normal Subjects:</label>
+        <input type="number" id="normalCount${i}" min="1" value="3">
+        <div id="normalList${i}"></div>
+        <button onclick="addNormalSubjects(${i})">Add Normal Subjects</button>
+
+        <label>Number of Lab Subjects:</label>
+        <input type="number" id="labCount${i}" min="0" value="1">
+        <div id="labList${i}"></div>
+        <button onclick="addLabSubjects(${i})">Add Lab Subjects</button>
+      </div>
+    `;
+  }
+}
+
+function addNormalSubjects(i) {
+  const n = parseInt(document.getElementById('normalCount' + i).value);
+  const div = document.getElementById('normalList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Subject ${j+1}" id="sub${i}_${j}">
+      <input type="text" placeholder="Teacher ${j+1}" id="teach${i}_${j}">
+      <input type="number" placeholder="Total appearances (e.g. 5)" id="subCount${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+function addLabSubjects(i) {
+  const n = parseInt(document.getElementById('labCount' + i).value);
+  const div = document.getElementById('labList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Lab Subject ${j+1}" id="labsub${i}_${j}">
+      <input type="text" placeholder="Lab Teacher ${j+1}" id="labteach${i}_${j}">
+      <input type="number" placeholder="Total labs (each = 2 periods)" id="labCountTotal${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+function generateTimetables() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const output = document.getElementById('output');
+  const teacherOutput = document.getElementById('teacherOutput');
+  output.innerHTML = '';
+  teacherOutput.innerHTML = '';
+
+  const teacherTables = {};
+
+  for (let i = 0; i < n; i++) {
+    const cname = document.getElementById('cname' + i).value;
+    const numDays = parseInt(document.getElementById('days' + i).value);
+    const periods = parseInt(document.getElementById('periods' + i).value);
+    const dayType = document.getElementById('dayType' + i).value;
+
+    const subjects = [];
+    const labs = [];
+
+    // Normal subjects
+    const normalCount = parseInt(document.getElementById('normalCount' + i).value);
+    for (let j = 0; j < normalCount; j++) {
+      const sub = document.getElementById(`sub${i}_${j}`)?.value;
+      const t = document.getElementById(`teach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`subCount${i}_${j}`)?.value);
+      if (sub && t && count) subjects.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    // Lab subjects
+    const labCount = parseInt(document.getElementById('labCount' + i).value);
+    for (let j = 0; j < labCount; j++) {
+      const sub = document.getElementById(`labsub${i}_${j}`)?.value;
+      const t = document.getElementById(`labteach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`labCountTotal${i}_${j}`)?.value);
+      if (sub && t && count) labs.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    const days = dayType === "Mon-Sat"
+      ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].slice(0, numDays)
+      : Array.from({length: numDays}, (_,k)=>`Day ${k+1}`);
+
+    let classTable = `<h2>${cname}</h2><button class='download-btn' onclick="downloadPDF('${cname}')">Download ${cname} PDF</button><div id='${cname.replace(/\s/g,'_')}_table'><table><tr><th>Day/Period</th>`;
+    for (let p = 1; p <= periods; p++) classTable += `<th>P${p}</th>`;
+    classTable += `</tr>`;
+
+    const timetable = [];
+
+    for (let d = 0; d < numDays; d++) {
+      const row = [];
+      let p = 0;
+      while (p < periods) {
+        // Try lab (2 continuous)
+        if (labs.length > 0 && Math.random() < 0.3 && p < periods - 1) {
+          const lab = labs.find(l => l.remaining > 0);
+          if (lab) {
+            row.push({sub: lab.subject, teach: lab.teacher, lab: true});
+            row.push({sub: lab.subject, teach: lab.teacher, lab: true});
+            lab.remaining--;
+            p += 2;
+            continue;
+          }
+        }
+        const availSubs = subjects.filter(s => s.remaining > 0);
+        if (availSubs.length === 0) break;
+        const s = availSubs[Math.floor(Math.random() * availSubs.length)];
+        row.push({sub: s.subject, teach: s.teacher});
+        s.remaining--;
+        p++;
+      }
+      timetable.push(row);
+    }
+
+    // Build table HTML
+    for (let d = 0; d < numDays; d++) {
+      classTable += `<tr><td>${days[d]}</td>`;
+      for (let p = 0; p < periods; p++) {
+        const cell = timetable[d][p];
+        if (!cell) { classTable += `<td></td>`; continue; }
+        const cellText = `${cell.sub} (${cell.teach})`;
+        classTable += `<td class='${cell.lab ? "lab":""}'>${cellText}</td>`;
+        // Add to teacher table
+        if (!teacherTables[cell.teach]) teacherTables[cell.teach] = {};
+        if (!teacherTables[cell.teach][days[d]]) teacherTables[cell.teach][days[d]] = Array(periods).fill("");
+        teacherTables[cell.teach][days[d]][p] = `${cname} - ${cell.sub}`;
+      }
+      classTable += `</tr>`;
+    }
+
+    classTable += `</table></div>`;
+    output.innerHTML += classTable;
+  }
+
+  // Generate Teacher Timetables
+  teacherOutput.innerHTML = `<h2>📘 Teacher Timetables</h2>`;
+  for (const [teacher, daysObj] of Object.entries(teacherTables)) {
+    let tHTML = `<h3>${teacher}</h3><button class='download-btn' onclick="downloadPDF('${teacher}')">Download ${teacher} PDF</button><div id='${teacher.replace(/\s/g,'_')}_table'><table><tr><th>Day/Period</th>`;
+    const periods = Math.max(...Object.values(daysObj).map(arr => arr.length));
+    for (let p = 1; p <= periods; p++) tHTML += `<th>P${p}</th>`;
+    tHTML += `</tr>`;
+    for (const [day, arr] of Object.entries(daysObj)) {
+      tHTML += `<tr><td>${day}</td>`;
+      arr.forEach(c => tHTML += `<td>${c}</td>`);
+      tHTML += `</tr>`;
+    }
+    tHTML += `</table></div>`;
+    teacherOutput.innerHTML += tHTML;
+  }
+}
+
+// Download PDF
+async function downloadPDF(name) {
+  const { jsPDF } = window.jspdf;
+  const div = document.getElementById(name.replace(/\s/g, "_") + "_table");
+  const canvas = await html2canvas(div);
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF('l', 'pt', 'a4');
+  const width = pdf.internal.pageSize.getWidth();
+  const height = (canvas.height * width) / canvas.width;
+  pdf.addImage(imgData, 'PNG', 10, 10, width - 20, height);
+  pdf.save(name + "_Timetable.pdf");
+}
+</script>
+</body>
+</html>
+ --> 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Automatic Timetable Generator</title>
+<style>
+  body {
+    font-family: "Poppins", sans-serif;
+    background: #eef3ff;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  h1 {
+    text-align: center;
+    color: #2b3eaa;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+  }
+  input, button, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  button {
+    background: #2b3eaa;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover {
+    background: #182677;
+  }
+  .class-block {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #aaa;
+    padding: 8px;
+    text-align: center;
+  }
+  th {
+    background: #dbe2ff;
+  }
+  td.lab {
+    background-color: #b8f7b8;
+    font-weight: bold;
+  }
+  .download-btn {
+    background: #00994d;
+    margin: 10px 0;
+  }
+  .download-btn:hover {
+    background: #006633;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Advanced Timetable Generator</h1>
+
+  <label>Number of Classes:</label>
+  <input type="number" id="numClasses" min="1" value="1">
+  <button onclick="createClassInputs()">Next ➜</button>
+
+  <div id="classInputs"></div>
+  <button onclick="generateTimetables()">Generate All Timetables</button>
+
+  <div id="output"></div>
+  <div id="teacherOutput"></div>
+</div>
+
+<!-- jsPDF for PDF download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+function createClassInputs() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const div = document.getElementById('classInputs');
+  div.innerHTML = '';
+
+  for (let i = 0; i < n; i++) {
+    div.innerHTML += `
+      <div class="class-block" id="class${i}">
+        <h3>Class ${i + 1}</h3>
+        <label>Class Name:</label>
+        <input type="text" id="cname${i}" placeholder="e.g. 1st Year CSE">
+
+        <label>Number of Days:</label>
+        <input type="number" id="days${i}" min="1" value="5">
+
+        <label>Periods per Day:</label>
+        <input type="number" id="periods${i}" min="1" value="6">
+
+        <label>Day Order or Week Format:</label>
+        <select id="dayType${i}">
+          <option value="Mon-Sat">Mon-Sat</option>
+          <option value="Day Order">Day Order (1,2,3,...)</option>
+        </select>
+
+        <label>Number of Normal Subjects:</label>
+        <input type="number" id="normalCount${i}" min="1" value="3">
+        <div id="normalList${i}"></div>
+        <button onclick="addNormalSubjects(${i})">Add Normal Subjects</button>
+
+        <label>Number of Lab Subjects:</label>
+        <input type="number" id="labCount${i}" min="0" value="1">
+        <div id="labList${i}"></div>
+        <button onclick="addLabSubjects(${i})">Add Lab Subjects</button>
+      </div>
+    `;
+  }
+}
+
+function addNormalSubjects(i) {
+  const n = parseInt(document.getElementById('normalCount' + i).value);
+  const div = document.getElementById('normalList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Subject ${j+1}" id="sub${i}_${j}">
+      <input type="text" placeholder="Teacher ${j+1}" id="teach${i}_${j}">
+      <input type="number" placeholder="Total appearances (e.g. 5)" id="subCount${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+function addLabSubjects(i) {
+  const n = parseInt(document.getElementById('labCount' + i).value);
+  const div = document.getElementById('labList' + i);
+  div.innerHTML = '';
+  for (let j = 0; j < n; j++) {
+    div.innerHTML += `
+      <input type="text" placeholder="Lab Subject ${j+1}" id="labsub${i}_${j}">
+      <input type="text" placeholder="Lab Teacher ${j+1}" id="labteach${i}_${j}">
+      <input type="number" placeholder="Total labs (each = 2 periods)" id="labCountTotal${i}_${j}" min="1">
+      <br>
+    `;
+  }
+}
+
+// Check teacher availability
+function isTeacherBusy(teacher, day, startPeriod, length, busyMap) {
+  if (!busyMap[teacher]) busyMap[teacher] = {};
+  if (!busyMap[teacher][day]) busyMap[teacher][day] = {};
+  for (let i = 0; i < length; i++) {
+    if (busyMap[teacher][day][startPeriod + i]) return true;
+  }
+  return false;
+}
+function markTeacherBusy(teacher, day, startPeriod, length, busyMap) {
+  if (!busyMap[teacher]) busyMap[teacher] = {};
+  if (!busyMap[teacher][day]) busyMap[teacher][day] = {};
+  for (let i = 0; i < length; i++) {
+    busyMap[teacher][day][startPeriod + i] = true;
+  }
+}
+
+function generateTimetables() {
+  const n = parseInt(document.getElementById('numClasses').value);
+  const output = document.getElementById('output');
+  const teacherOutput = document.getElementById('teacherOutput');
+  output.innerHTML = '';
+  teacherOutput.innerHTML = '';
+
+  const teacherTables = {};
+  let teacherBusy = {}; // Global availability tracker
+
+  for (let i = 0; i < n; i++) {
+    const cname = document.getElementById('cname' + i).value;
+    const numDays = parseInt(document.getElementById('days' + i).value);
+    const periods = parseInt(document.getElementById('periods' + i).value);
+    const dayType = document.getElementById('dayType' + i).value;
+
+    const subjects = [];
+    const labs = [];
+
+    // Normal subjects
+    const normalCount = parseInt(document.getElementById('normalCount' + i).value);
+    for (let j = 0; j < normalCount; j++) {
+      const sub = document.getElementById(`sub${i}_${j}`)?.value;
+      const t = document.getElementById(`teach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`subCount${i}_${j}`)?.value);
+      if (sub && t && count) subjects.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    // Lab subjects
+    const labCount = parseInt(document.getElementById('labCount' + i).value);
+    for (let j = 0; j < labCount; j++) {
+      const sub = document.getElementById(`labsub${i}_${j}`)?.value;
+      const t = document.getElementById(`labteach${i}_${j}`)?.value;
+      const count = parseInt(document.getElementById(`labCountTotal${i}_${j}`)?.value);
+      if (sub && t && count) labs.push({ subject: sub, teacher: t, remaining: count });
+    }
+
+    const days = dayType === "Mon-Sat"
+      ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].slice(0, numDays)
+      : Array.from({length: numDays}, (_,k)=>`Day ${k+1}`);
+
+    let classTable = `<h2>${cname}</h2><button class='download-btn' onclick="downloadPDF('${cname}')">Download ${cname} PDF</button><div id='${cname.replace(/\s/g,'_')}_table'><table><tr><th>Day/Period</th>`;
+    for (let p = 1; p <= periods; p++) classTable += `<th>P${p}</th>`;
+    classTable += `</tr>`;
+
+    const timetable = [];
+
+    for (let d = 0; d < numDays; d++) {
+      const row = [];
+      let p = 0;
+      while (p < periods) {
+        // Try lab (2 continuous)
+        if (labs.length > 0 && Math.random() < 0.3 && p < periods - 1) {
+          const lab = labs.find(l => l.remaining > 0);
+          if (lab && !isTeacherBusy(lab.teacher, days[d], p, 2, teacherBusy)) {
+            row.push({sub: lab.subject, teach: lab.teacher, lab: true});
+            row.push({sub: lab.subject, teach: lab.teacher, lab: true});
+            lab.remaining--;
+            markTeacherBusy(lab.teacher, days[d], p, 2, teacherBusy);
+            p += 2;
+            continue;
+          }
+        }
+        const availSubs = subjects.filter(s => s.remaining > 0);
+        if (availSubs.length === 0) { row.push({sub:"FREE",teach:""}); p++; continue; }
+        let assigned = false;
+        for (let trial = 0; trial < availSubs.length; trial++) {
+          const s = availSubs[Math.floor(Math.random() * availSubs.length)];
+          if (!isTeacherBusy(s.teacher, days[d], p, 1, teacherBusy)) {
+            row.push({sub: s.subject, teach: s.teacher});
+            s.remaining--;
+            markTeacherBusy(s.teacher, days[d], p, 1, teacherBusy);
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned) row.push({sub:"FREE",teach:""});
+        p++;
+      }
+      timetable.push(row);
+    }
+
+    // Build table HTML
+    for (let d = 0; d < numDays; d++) {
+      classTable += `<tr><td>${days[d]}</td>`;
+      for (let p = 0; p < periods; p++) {
+        const cell = timetable[d][p];
+        if (!cell) { classTable += `<td></td>`; continue; }
+        const cellText = `${cell.sub} ${cell.teach? "(" + cell.teach + ")" : ""}`;
+        classTable += `<td class='${cell.lab ? "lab":""}'>${cellText}</td>`;
+        // Add to teacher table
+        if (cell.teach) {
+          if (!teacherTables[cell.teach]) teacherTables[cell.teach] = {};
+          if (!teacherTables[cell.teach][days[d]]) teacherTables[cell.teach][days[d]] = Array(periods).fill("");
+          teacherTables[cell.teach][days[d]][p] = `${cname} - ${cell.sub}`;
+        }
+      }
+      classTable += `</tr>`;
+    }
+
+    classTable += `</table></div>`;
+    output.innerHTML += classTable;
+  }
+
+  // Generate Teacher Timetables
+  teacherOutput.innerHTML = `<h2>📘 Teacher Timetables</h2>`;
+  for (const [teacher, daysObj] of Object.entries(teacherTables)) {
+    let tHTML = `<h3>${teacher}</h3><button class='download-btn' onclick="downloadPDF('${teacher}')">Download ${teacher} PDF</button><div id='${teacher.replace(/\s/g,'_')}_table'><table><tr><th>Day/Period</th>`;
+    const periods = Math.max(...Object.values(daysObj).map(arr => arr.length));
+    for (let p = 1; p <= periods; p++) tHTML += `<th>P${p}</th>`;
+    tHTML += `</tr>`;
+    for (const [day, arr] of Object.entries(daysObj)) {
+      tHTML += `<tr><td>${day}</td>`;
+      arr.forEach(c => tHTML += `<td>${c}</td>`);
+      tHTML += `</tr>`;
+    }
+    tHTML += `</table></div>`;
+    teacherOutput.innerHTML += tHTML;
+  }
+}
+
+// Download PDF
+async function downloadPDF(name) {
+  const { jsPDF } = window.jspdf;
+  const div = document.getElementById(name.replace(/\s/g, "_") + "_table");
+  const canvas = await html2canvas(div);
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF('l', 'pt', 'a4');
+  const width = pdf.internal.pageSize.getWidth();
+  const height = (canvas.height * width) / canvas.width;
+  pdf.addImage(imgData, 'PNG', 10, 10, width - 20, height);
+  pdf.save(name + "_Timetable.pdf");
+}
+</script>
+</body>
+</html>
